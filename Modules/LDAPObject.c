@@ -568,6 +568,15 @@ static int interaction ( unsigned flags,
   if (result == NULL) 
     /*searching for a better error code */
     return LDAP_OPERATIONS_ERROR; 
+  if (PyUnicode_Check(result)) {
+    /* The callback should have returned a PyUnicode, which we need to encode
+     * as UTF-8 before passing on. c.f. definition of authzid in RFC4616,
+     * which says it should be a UTF-8-encoded string. If it's a PyBytes
+     * object we'll leave it alone and assume it's a UTF-8-encoded string. */
+    PyObject* old_result = result;
+    result = PyUnicode_AsUTF8String(result);
+    Py_DECREF(old_result);
+  }
   c_result = PyBytes_AsString(result); /*xxx Error checking?? */
   
   /* according to the sasl docs, we should malloc() the returned
@@ -663,6 +672,11 @@ l_ldap_sasl_interactive_bind_s( LDAPObject* self, PyObject* args )
     /* now we extract the sasl mechanism from the SASL Object */
     mechanism = PyObject_GetAttrString(SASLObject, "mech");
     if (mechanism == NULL) return NULL;
+    if (PyUnicode_Check(mechanism)) {
+      PyObject* old_mechanism = mechanism;
+      mechanism = PyUnicode_AsUTF8String(mechanism);
+      Py_DECREF(old_mechanism);
+    }
     c_mechanism = PyBytes_AsString(mechanism);
     Py_DECREF(mechanism);
     mechanism = NULL;
